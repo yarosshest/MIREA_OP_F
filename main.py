@@ -1,8 +1,9 @@
+import requests
 import vk_api
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.utils import get_random_id
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
-from constants import VK_TOKEN
+from constants import VK_TOKEN, API_WEATHER
 from parsing import load_table, download_table
 import pickle
 import os.path
@@ -19,6 +20,12 @@ def num_week():
     now_week = now.isocalendar()[1]
     start_week = datetime.date(2022, 2, 9).isocalendar()[1]
     return now_week - start_week + 1
+
+
+def get_weather():
+    response = requests.get("http://api.openweathermap.org/data/2.5/weather?q=moscow&lang=ru&units=metric&appid={}&units=metric".format(API_WEATHER))
+    info = response.json()
+    return info
 
 
 class Bot(object):
@@ -42,6 +49,11 @@ class Bot(object):
         self.vk.messages.send(user_id=vk_id,
                               random_id=get_random_id(),
                               message='Я запомнил, что ты из группы ' + group)
+
+    def send_chat_error(self, vk_id):
+        self.vk.messages.send(user_id=vk_id,
+                              random_id=get_random_id(),
+                              message='Неизвестная команда')
 
     def show_keyboard(self, vk_id):
         kb = VkKeyboard(one_time=True)
@@ -79,7 +91,7 @@ class Bot(object):
                 res.append(table[i])
         otv = ''
         for i in range(len(res) - 1):
-            otv += '{}) {} \n'.format(str(i+1), res[i])
+            otv += '{}) {} \n'.format(str(i + 1), res[i])
         otv += '{}) {} '.format(str(6), res[-1])
         return otv
 
@@ -123,10 +135,10 @@ class Bot(object):
                               random_id=get_random_id(),
                               message=msg)
 
-    def show_user_day(self, vk_id, day):
+    def show_user_day(self, vk_id, day, group):
         msg = ''
-        msg += self.get_day(day, 1, self.db.get_group(vk_id))
-        msg += self.get_day(day, 2, self.db.get_group(vk_id))
+        msg += self.get_day(day, 1, group) + '\n'
+        msg += self.get_day(day, 2, group)
         self.vk.messages.send(user_id=vk_id,
                               random_id=get_random_id(),
                               message=msg)
@@ -149,6 +161,18 @@ class Bot(object):
             message='Показать расписание …'
         )
 
+    def show_weather(self, vk_id):
+        response = get_weather()
+        msg = 'Погода в Москве ' + response['weather'][0]['description'] + "\n"
+        msg += 'Температура: ' + str(response['main']['temp_min']) + '-' + str(response['main']['temp_max']) + "°C" + "\n"
+        msg += 'Давление: ' + str(response['main']['pressure']) + 'мм рт. ст.'+ "Влажность " + str(response['main']['humidity']) + "%" + "\n"
+        msg += 'Ветер: ' + str(response["wind"]['speed']) + 'м/с, ' + str(response["wind"]['deg']) + "°"
+        self.vk.messages.send(user_id=vk_id,
+                              random_id=get_random_id(),
+                              message=msg)
+
+
+
     def run(self):
         poll = VkLongPoll(self.session)
         for event in poll.listen():
@@ -170,7 +194,8 @@ class Bot(object):
                 elif 'на следующую неделю' == event.text.lower():
                     self.show_next_week(event.user_id, self.db.get_group(event.user_id))
                 elif event.text.lower() in comands_days_week:
-                    self.show_user_day(event.user_id, comands_days_week.index(event.text.lower()))
+                    self.show_user_day(event.user_id, comands_days_week.index(event.text.lower()),
+                                       self.db.get_group(event.user_id))
                 elif len(re.findall(r'^бот \w+-\d{2}-\d{2}', event.text.lower())) == 1:
                     self.show_group_keyboard(event.user_id, re.findall(r'\w+-\d{2}-\d{2}', event.text)[0])
                 elif len(re.findall(r'^на сегодня \w+-\d{2}-\d{2}', event.text.lower())) == 1:
@@ -181,11 +206,18 @@ class Bot(object):
                     self.show_this_week(event.user_id, re.findall(r'\w+-\d{2}-\d{2}', event.text)[0])
                 elif len(re.findall(r'^на следующую неделю \w+-\d{2}-\d{2}', event.text.lower())) == 1:
                     self.show_next_week(event.user_id, re.findall(r'\w+-\d{2}-\d{2}', event.text)[0])
-                elif len(re.findall(r'^на следующую неделю \w+-\d{2}-\d{2}', event.text.lower())) == 1:
-                    self.show_next_week(event.user_id, re.findall(r'\w+-\d{2}-\d{2}', event.text)[0])
+                elif len(re.findall(r'^бот (?:понедельник|втоник|среда|четверг|пятница|суббота) \w+-\d{2}-\d{2}$',
+                                    event.text.lower())) == 1:
+                    self.show_user_day(event.user_id,
+                                       name_days_week.index(
+                                           re.findall(r'(?:понедельник|втоник|среда|четверг|пятница|суббота)',
+                                                      event.text)[0]),
+                                       re.findall(r'\w+-\d{2}-\d{2}', event.text)[0])
+                elif 'погода' == event.text.lower():
+                    self.show_weather(event.user_id)
 
 
 if __name__ == '__main__':
-    print('бот вторник ИКБО-30-21')
+    get_weather()
     bot = Bot()
     bot.run()
