@@ -83,54 +83,71 @@ class Bot(object):
         otv += '{}) {} '.format(str(6), res[-1])
         return otv
 
-    def show_today(self, vk_id):
+    def show_today(self, vk_id, group):
         day = datetime.datetime.now().weekday()
         if day != 6:
-            msg = self.get_day(day, num_week(), self.db.get_group(vk_id))
+            msg = self.get_day(day, num_week(), group)
         else:
             msg = "Пар нет"
         self.vk.messages.send(user_id=vk_id,
                               random_id=get_random_id(),
                               message=msg)
 
-    def show_tomorrow(self, vk_id):
+    def show_tomorrow(self, vk_id, group):
         day = (datetime.datetime.now().weekday() + 1) % 7
         if day != 6:
-            msg = self.get_day(day, num_week() + (datetime.datetime.now().weekday() + 1) // 7, self.db.get_group(vk_id))
+            msg = self.get_day(day, num_week() + (datetime.datetime.now().weekday() + 1) // 7, group)
         else:
             msg = "Пар нет"
         self.vk.messages.send(user_id=vk_id,
                               random_id=get_random_id(),
                               message=msg)
 
-    def show_this_week(self, vk_id):
+    def show_this_week(self, vk_id, group):
         msg = ''
         for i in range(6):
             msg += '\n' + name_days_week[i] + '\n'
-            msg += self.get_day(i, num_week(), self.db.get_group(vk_id))
+            msg += self.get_day(i, num_week(), group)
             msg += '\n' + '_______________________'
         self.vk.messages.send(user_id=vk_id,
                               random_id=get_random_id(),
                               message=msg)
 
-    def show_next_week(self, vk_id):
+    def show_next_week(self, vk_id, group):
         msg = ''
         for i in range(6):
             msg += '\n' + name_days_week[i] + '\n'
-            msg += self.get_day(i, num_week() + 1, self.db.get_group(vk_id))
+            msg += self.get_day(i, num_week() + 1, group)
             msg += '\n' + '_______________________'
         self.vk.messages.send(user_id=vk_id,
                               random_id=get_random_id(),
                               message=msg)
 
     def show_user_day(self, vk_id, day):
-        if day != 6:
-            msg = self.get_day(day, num_week(), self.db.get_group(vk_id))
-        else:
-            msg = "Пар нет"
+        msg = ''
+        msg += self.get_day(day, 1, self.db.get_group(vk_id))
+        msg += self.get_day(day, 2, self.db.get_group(vk_id))
         self.vk.messages.send(user_id=vk_id,
                               random_id=get_random_id(),
                               message=msg)
+
+    def show_group_keyboard(self, vk_id, group):
+        kb = VkKeyboard(one_time=True)
+        kb.add_button('на сегодня {}'.format(group), color=VkKeyboardColor.NEGATIVE)
+        kb.add_button('на завтра {}'.format(group), color=VkKeyboardColor.POSITIVE)
+        kb.add_line()
+        kb.add_button('на эту неделю {}'.format(group), color=VkKeyboardColor.PRIMARY)
+        kb.add_button('на следующую неделю {}'.format(group), color=VkKeyboardColor.PRIMARY)
+        kb.add_line()
+        kb.add_button('какая неделя?', color=VkKeyboardColor.SECONDARY)
+        kb.add_button('какая группа?', color=VkKeyboardColor.SECONDARY)
+
+        self.vk.messages.send(
+            user_id=vk_id,
+            random_id=get_random_id(),
+            keyboard=kb.get_keyboard(),
+            message='Показать расписание …'
+        )
 
     def run(self):
         poll = VkLongPoll(self.session)
@@ -145,17 +162,30 @@ class Bot(object):
                 elif 'какая группа?' == event.text.lower():
                     self.show_group(event.user_id)
                 elif 'на сегодня' == event.text.lower():
-                    self.show_today(event.user_id)
+                    self.show_today(event.user_id, self.db.get_group(event.user_id))
                 elif 'на завтра' == event.text.lower():
-                    self.show_tomorrow(event.user_id)
+                    self.show_tomorrow(event.user_id, self.db.get_group(event.user_id))
                 elif 'на эту неделю' == event.text.lower():
-                    self.show_this_week(event.user_id)
+                    self.show_this_week(event.user_id, self.db.get_group(event.user_id))
                 elif 'на следующую неделю' == event.text.lower():
-                    self.show_next_week(event.user_id)
+                    self.show_next_week(event.user_id, self.db.get_group(event.user_id))
                 elif event.text.lower() in comands_days_week:
                     self.show_user_day(event.user_id, comands_days_week.index(event.text.lower()))
+                elif len(re.findall(r'^бот \w+-\d{2}-\d{2}', event.text.lower())) == 1:
+                    self.show_group_keyboard(event.user_id, re.findall(r'\w+-\d{2}-\d{2}', event.text)[0])
+                elif len(re.findall(r'^на сегодня \w+-\d{2}-\d{2}', event.text.lower())) == 1:
+                    self.show_today(event.user_id, re.findall(r'\w+-\d{2}-\d{2}', event.text)[0])
+                elif len(re.findall(r'^на завтра \w+-\d{2}-\d{2}', event.text.lower())) == 1:
+                    self.show_tomorrow(event.user_id, re.findall(r'\w+-\d{2}-\d{2}', event.text)[0])
+                elif len(re.findall(r'^на эту неделю \w+-\d{2}-\d{2}', event.text.lower())) == 1:
+                    self.show_this_week(event.user_id, re.findall(r'\w+-\d{2}-\d{2}', event.text)[0])
+                elif len(re.findall(r'^на следующую неделю \w+-\d{2}-\d{2}', event.text.lower())) == 1:
+                    self.show_next_week(event.user_id, re.findall(r'\w+-\d{2}-\d{2}', event.text)[0])
+                elif len(re.findall(r'^на следующую неделю \w+-\d{2}-\d{2}', event.text.lower())) == 1:
+                    self.show_next_week(event.user_id, re.findall(r'\w+-\d{2}-\d{2}', event.text)[0])
 
 
 if __name__ == '__main__':
+    print('бот вторник ИКБО-30-21')
     bot = Bot()
     bot.run()
