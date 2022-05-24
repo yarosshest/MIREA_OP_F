@@ -11,7 +11,7 @@ import os.path
 import re
 from sql import DatabaseFunction
 import datetime
-from COVID_parsing import draw_stat_rus_ten, get_today
+from COVID_parsing import draw_stat_rus_ten, get_today, get_area
 
 name_days_week = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота"]
 comands_days_week = ["бот понедельник", "бот вторник", "бот среда", "бот четверг", "бот пятница", "бот суббота"]
@@ -195,6 +195,15 @@ class Bot(object):
             message=msg
         )
 
+    def show_reg_covid(self, vk_id, reg):
+        reg = ' '.join(reg.split(' ')[1:])
+        msg = get_area(reg)
+        self.vk.messages.send(
+            random_id=get_random_id(),
+            peer_id=vk_id,
+            message=msg
+        )
+
     def run(self):
         poll = VkLongPoll(self.session)
         for event in poll.listen():
@@ -239,6 +248,8 @@ class Bot(object):
                     self.show_weather(event.user_id)
                 elif 'корона' == event.text.lower():
                     self.show_covid(event.user_id)
+                elif len(re.findall(r'^корона \w+', event.text.lower())) == 1:
+                    self.show_reg_covid(event.user_id, event.text)
 
 
 if __name__ == '__main__':

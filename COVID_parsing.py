@@ -1,6 +1,5 @@
 import requests
 from bs4 import BeautifulSoup
-import PIL.Image as Image
 import matplotlib.pyplot as plt
 from matplotlib import ticker
 from matplotlib.ticker import FormatStrFormatter
@@ -45,6 +44,7 @@ def get_today():
     page = requests.get("https://coronavirusstat.ru/#world")
     soup = BeautifulSoup(page.text, "html.parser")
     rus = soup.find("div", attrs={'class': "row border border-bottom-0 c_search2_row", 'id': "c_russia"})
+
     big = rus.find_all("span", attrs={'class': "dline"})
     all = rus.find_all("div", attrs={'class': "h6 m-0"})[-1]
     small = rus.find_all("span", attrs={'title': "За 1 день"})
@@ -64,20 +64,25 @@ def get_today():
 def get_area(area):
     page = requests.get("https://coronavirusstat.ru/country/russia/")
     soup = BeautifulSoup(page.text, "html.parser")
-    rus = soup.find(area)
-    big = rus.find_all("a", text=area)
-    all = rus.find_all("div", attrs={'class': "h6 m-0"})[-1]
-    small = rus.find_all("span", attrs={'title': "За 1 день"})
+    a = soup.find("a", text=area)
+    if a is None:
+        msg = None
+    else:
+        reg = soup.find("a", text=area).parent.parent.parent.parent
 
-    data = soup.find("strong").text
-    buf = all.text.replace("\n", "")
-    buf = buf.replace("\t", " ")
-    buf = buf.split(" ")[4]
-    msg = f"По состоянию {data}\n" \
-          f"Случаев {buf} ({small[3].text} за cегодня) \n" \
-          f"Активных {big[0].text} ({small[0].text} за cегодня) \n" \
-          f"Вылечено {big[1].text} ({small[1].text} за сегодня) \n" \
-          f"Умерло {big[2].text} ({small[2].text} за cегодня) \n"
+        big = reg.find_all("span", attrs={'class': "dline"})
+        all = reg.find_all("div", attrs={'class': "h6 m-0"})[-1]
+        small = reg.find_all("span", attrs={'title': "За 1 день"})
+
+        data = soup.find("strong").text
+        buf = all.text.replace("\n", "")
+        buf = buf.replace("\t", " ")
+        buf = buf.split(" ")[0]
+        msg = f"По состоянию {data}\n" \
+              f"Случаев {buf} ({small[3].text} за cегодня) \n" \
+              f"Активных {big[0].text} ({small[0].text} за cегодня) \n" \
+              f"Вылечено {big[1].text} ({small[1].text} за сегодня) \n" \
+              f"Умерло {big[2].text} ({small[2].text} за cегодня) \n"
     return msg
 
 
