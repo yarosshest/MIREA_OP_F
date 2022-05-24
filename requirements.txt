@@ -1,7 +1,10 @@
 vk-api
 requests
 bs4
+Pillow
+matplotlib
 pandas
 openpyxl
 tqdm
+gazpacho
 sqlalchemy

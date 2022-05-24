@@ -5,14 +5,17 @@ from vk_api.utils import get_random_id
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from constants import VK_TOKEN, API_WEATHER
 from parsing import load_table, download_table
+from vk_api.upload import VkUpload
 import pickle
 import os.path
 import re
 from sql import DatabaseFunction
 import datetime
+from COVID_parsing import draw_stat_rus_ten, get_today
 
 name_days_week = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота"]
 comands_days_week = ["бот понедельник", "бот вторник", "бот среда", "бот четверг", "бот пятница", "бот суббота"]
+
 
 
 def num_week():
@@ -34,11 +37,21 @@ class Bot(object):
         self.session = vk_api.VkApi(token=VK_TOKEN)
         self.vk = self.session.get_api()
         self.db = DatabaseFunction()
+        self.upload = VkUpload(self.vk)
 
         if os.path.exists('table.pickle'):
             self.load_table()
         else:
             download_table()
+
+    def upload_photo(self, photo):
+        response = self.upload.photo_messages(photo)[0]
+
+        owner_id = response['owner_id']
+        photo_id = response['id']
+        access_key = response['access_key']
+
+        return owner_id, photo_id, access_key
 
     def load_table(self):
         with open('table.pickle', 'rb') as f:
@@ -165,13 +178,22 @@ class Bot(object):
         response = get_weather()
         msg = 'Погода в Москве ' + response['weather'][0]['description'] + "\n"
         msg += 'Температура: ' + str(response['main']['temp_min']) + '-' + str(response['main']['temp_max']) + "°C" + "\n"
-        msg += 'Давление: ' + str(response['main']['pressure']) + 'мм рт. ст.'+ "Влажность " + str(response['main']['humidity']) + "%" + "\n"
+        msg += 'Давление: ' + str(response['main']['pressure']*0.75) + 'мм рт. ст.'+ "Влажность " + str(response['main']['humidity']) + "%" + "\n"
         msg += 'Ветер: ' + str(response["wind"]['speed']) + 'м/с, ' + str(response["wind"]['deg']) + "°"
         self.vk.messages.send(user_id=vk_id,
                               random_id=get_random_id(),
                               message=msg)
 
-
+    def show_covid(self, vk_id):
+        msg = get_today()
+        at = self.upload_photo(draw_stat_rus_ten())
+        attachment = f'photo{at[0]}_{at[1]}_{at[2]}'
+        self.vk.messages.send(
+            random_id=get_random_id(),
+            peer_id=vk_id,
+            attachment=attachment,
+            message=msg
+        )
 
     def run(self):
         poll = VkLongPoll(self.session)
@@ -215,6 +237,8 @@ class Bot(object):
                                        re.findall(r'\w+-\d{2}-\d{2}', event.text)[0])
                 elif 'погода' == event.text.lower():
                     self.show_weather(event.user_id)
+                elif 'корона' == event.text.lower():
+                    self.show_covid(event.user_id)
 
 
 if __name__ == '__main__':
