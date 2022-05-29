@@ -2,7 +2,6 @@ import requests
 from bs4 import BeautifulSoup
 import matplotlib.pyplot as plt
 from matplotlib import ticker
-from matplotlib.ticker import FormatStrFormatter
 import re
 
 
@@ -64,11 +63,12 @@ def get_today():
 def get_area(area):
     page = requests.get("https://coronavirusstat.ru/country/russia/")
     soup = BeautifulSoup(page.text, "html.parser")
-    a = soup.find("a", text=area)
+    pattern = re.compile(area)
+    a = soup.find("a", text=pattern)
     if a is None:
-        msg = None
+        msg = "Регион не найден"
     else:
-        reg = soup.find("a", text=area).parent.parent.parent.parent
+        reg = soup.find("a", text=pattern).parent.parent.parent.parent
 
         big = reg.find_all("span", attrs={'class': "dline"})
         all = reg.find_all("div", attrs={'class': "h6 m-0"})[-1]
@@ -76,10 +76,10 @@ def get_area(area):
 
         data = soup.find("strong").text
         buf = all.text.replace("\n", "")
-        buf = buf.replace("\t", " ")
-        buf = buf.split(" ")[0]
+        buf = buf.replace("\t", "")
+        buf = buf.split(" ")
         msg = f"По состоянию {data}\n" \
-              f"Случаев {buf} ({small[3].text} за cегодня) \n" \
+              f"Случаев {buf[1]} ({buf[2]} за cегодня) \n" \
               f"Активных {big[0].text} ({small[0].text} за cегодня) \n" \
               f"Вылечено {big[1].text} ({small[1].text} за сегодня) \n" \
               f"Умерло {big[2].text} ({small[2].text} за cегодня) \n"
@@ -87,4 +87,4 @@ def get_area(area):
 
 
 if __name__ == '__main__':
-    get_area("Нижегородская обл.")
+    print(get_area("Нижегородская обл."))
