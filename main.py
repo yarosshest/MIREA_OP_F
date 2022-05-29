@@ -263,6 +263,7 @@ class Bot(object):
             )
 
     def show_teacher(self,user_id, name):
+        name = ' '.join(name.split(' ')[1:])
         if self.db.get_table_teacher(name) is not None:
             kb = VkKeyboard(one_time=True)
             kb.add_button('на сегодня {}'.format(name), color=VkKeyboardColor.NEGATIVE)
